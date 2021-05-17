@@ -6,9 +6,17 @@ use Illuminate\Http\Request;
 use App\Http\Requests\PedidoRequest;
 use App\Models\Pedido;
 use App\Models\Cuenta;
+use App\Events\NotifyMessage;
+use MessagePack\MessagePack;
+use Redis;
 
 class PedidoController extends Controller
 {
+    public function __construct()
+    {
+        //$this->middleware('guest');
+    }
+
     /**
      * Mostrar un listado de pedidos transformados a un objeto JSON.
      *
@@ -24,7 +32,8 @@ class PedidoController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Guardar un nuevo pedido en la tabla pedidos,
+     * envio de notificación con información del pedido y de la cuenta asociada.
      *
      * @param  \Illuminate\Http\PedidoRequest  $request
      * @return \Illuminate\Http\Response
@@ -43,8 +52,14 @@ class PedidoController extends Controller
             // Consultar información del cliente
             $cliente = Cuenta::find($pedido->cuenta_id);
 
-            // Se debe notificar desde socket
-            //
+            $data = [
+                "client" => $cliente,
+                "pedido" => $pedido,
+            ];
+
+            //Envio de notificación con información del pedido y del cliente
+            //Uso de Redis para el envio de la data
+            Redis::publish("clientes", json_encode(['event' => 'match', 'message' => $data]));
 
             return response()->json('Se creó el pedido con código: '. $pedido->id);
         } catch (\Throwable $e){
@@ -53,7 +68,7 @@ class PedidoController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * Modificar un registro de la tabla pedidos.
      *
      * @param  \Illuminate\Http\PedidoRequest  $request
      * @param  int  $id
@@ -77,7 +92,7 @@ class PedidoController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Cancelar producto, eliminación logica usando el campo fecha_cancelacion.
      *
      * @param  int  $id
      * @return \Illuminate\Http\Response
@@ -93,6 +108,5 @@ class PedidoController extends Controller
         } catch (\Throwable $e){
             return response()->json($e->getMessage(),'500');
         }
-
     }
 }
